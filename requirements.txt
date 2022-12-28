@@ -1,0 +1,4 @@
+boto3==1.26.37
+botocore==1.29.37
+numpy==1.23.5
+pandas==1.5.2
