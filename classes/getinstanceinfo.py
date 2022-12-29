@@ -22,6 +22,7 @@ class Getinstanceinfo(object):
                     ('region', str),
                     ('instance_type', str),
                     ('db', str),
+                    ('engine', str),
                     ('multi_az', bool),
                     ('storage_type', str),
                     ('storage_size', int),
@@ -40,6 +41,7 @@ class Getinstanceinfo(object):
                         'region' : args.region, \
                         'instance_type' : dbinstance.get('DBInstanceClass'), \
                         'db' : dbinstance.get('DBName', 'NaN'), \
+                        'engine' : dbinstance.get('Engine', 'NaN'), \
                         'multi_az' : dbinstance.get('MultiAZ', 'NaN'), \
                         'storage_type' : dbinstance.get('StorageType', 'NaN'), \
                         'storage_size' : dbinstance.get('AllocatedStorage', 'NaN'), \
@@ -83,7 +85,7 @@ class Getinstanceinfo(object):
 
             cw_client = boto3.client('cloudwatch', region_name=row.region, config=config)
 
-            metric_list = ['storage_free', 'storage_write_iops', 'storage_read_iops', 'storage_write_throughput', 'storage_read_throughput']
+            #metric_list = ['storage_free', 'storage_write_iops', 'storage_read_iops', 'storage_write_throughput', 'storage_read_throughput']
             metric_dict = [
                 {
                     'metric_name':'FreeStorageSpace',
@@ -122,8 +124,6 @@ class Getinstanceinfo(object):
                 }
             ]
             result_list = []
-
-            # FreeStorageSpace, WriteIOPS, ReadIOPS, ReadThroughput, WriteThroughput
 
             for item in metric_dict:
                 val = getdata.cw_rds_pull_metric(cw_client, item['metric_name'], item['namespace'], item['instance_name'], row.instance, item['stat'], item['period'], args)
@@ -181,7 +181,51 @@ class Getinstanceinfo(object):
             traceback.print_exc()
             return 'NaN'
 
+    def gp3_adjustments(self, row, args):
+        try:
+            if row.engine in ['postgres', 'mysql', 'mariadb']:
+                if row.storage_size < 400:
+                    if row.storage_iops < 3000:
+                        return 3000, 125
+                    else:
+                        return row.storage_iops, 125
+                else:
+                    if row.storage_iops < 12000:
+                        return 12000, 500
+                    elif 12000 < row.storage_iops <= 64000:
+                        return row.storage_iops, 500
+                    else: 
+                        return 'NaN', 'NaN'
+            elif 'sqlserver' in row.engine:
+                if row.storage_iops < 3000:
+                    return 3000, 125
+                else:
+                    return row.storage_iops, 125
+            elif 'oracle' in row.engine:
+                if row.storage_size < 200:
+                    if row.storage_iops < 3000:
+                        return 3000, 125
+                    else:
+                        return row.storage_iops, 125
+                else:
+                    if row.storage_iops < 12000:
+                        return 12000, 500
+                    elif 12000 < row.storage_iops <= 64000:
+                        return row.storage_iops, 500
+                    else: 
+                        return 'NaN', 'NaN'
+            else:
+                return 'NaN'
+        except Exception as e: 
+            print(f'An error occurred during gp3 io and adjustments')
+            traceback.print_exc()
+            return 'NaN'
+
     def calc_gp3_costs(self, row, rds_pricing_df, storage_gb, storage_iops, storage_throughput, args):
+
+        # make adjustments for 
+        storage_iops_adjusted, storage_throughput_adjusted = self.gp3_adjustments(row, args)
+
         # calculate monthly storage GB costs 
         temp_df = rds_pricing_df[rds_pricing_df['usageType'].str.contains(storage_gb)]
         per_unit = float(temp_df['PricePerUnit'].iat[0])
@@ -191,15 +235,19 @@ class Getinstanceinfo(object):
         temp_df = rds_pricing_df[rds_pricing_df['usageType'].str.contains(storage_iops)]
         per_unit = float(temp_df['PricePerUnit'].iat[0])
         # consider 3000 built in for baseline cost
-        iops_monthly_cost = float((row.storage_iops) - 3000) * per_unit
+        iops_monthly_cost = float((storage_iops_adjusted) - 3000) * per_unit
 
-        storage_cost = gb_monthly_cost + iops_monthly_cost
+        # calculate monthly storage Throughput costs 
+        temp_df = rds_pricing_df[rds_pricing_df['usageType'].str.contains(storage_throughput)]
+        per_unit = float(temp_df['PricePerUnit'].iat[0])
+        # consider 125 MB/sec built in for baseline cost
+        throughput_monthly_cost = float((storage_throughput_adjusted) - 125) * per_unit
 
         if args.percent_discount is not None:
-            storage_cost = ((gb_monthly_cost + iops_monthly_cost) * (1.0 - args.percent_discount))
+            storage_cost = ((gb_monthly_cost + iops_monthly_cost + throughput_monthly_cost) * (1.0 - args.percent_discount))
             storage_cost = self.round_up(storage_cost, 2)
         else:
-            storage_cost = gb_monthly_cost + iops_monthly_cost
+            storage_cost = gb_monthly_cost + iops_monthly_cost + throughput_monthly_cost
 
         return storage_cost
 

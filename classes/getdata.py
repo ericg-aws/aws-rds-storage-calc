@@ -52,3 +52,4 @@ class Getdata(object):
             except Exception as e: 
                 print(f'An error occurred cloudwatch metric pull for {instance}')
                 traceback.print_exc()
+                return 'NaN'
