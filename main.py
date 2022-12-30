@@ -3,10 +3,10 @@
 # example for days back from current: python inference-get-metrics.py -d 7 -r us-east-2
 # utc start and endtime example: python inference-get-metrics.py -s '2022-06-25 02:00:00' -e '2022-07-12 02:00:00'
 
-from classes.getdata import Getdata
 from classes.getinstanceinfo import Getinstanceinfo
 
 import argparse
+import os
 import traceback
 
 # parse command-line arguments for region and input file
@@ -60,6 +60,8 @@ def main():
     if args.output_file is not None:
         instance_df.to_csv(args.output_file, index=False)
     else:
+        if not os.path.exists('data'):
+            os.makedirs('data')
         account_id = getinstanceinfo.get_account_info(args)
         output_file = f'data/{account_id}_{args.region}_rds_output.csv'
         instance_df.to_csv(output_file, index=False)

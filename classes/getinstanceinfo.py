@@ -49,7 +49,7 @@ class Getinstanceinfo(object):
             paginator = rds.get_paginator('describe_db_instances').paginate()
             for page in paginator:
                 for dbinstance in page['DBInstances']:
-                    pprint.pprint(dbinstance)
+                    #pprint.pprint(dbinstance)
                     if 'DBClusterIdentifier' in dbinstance:
                         pass
                         print('Skipping as instance is part of Multi-AZ Cluster or Aurora')
@@ -70,23 +70,6 @@ class Getinstanceinfo(object):
         except Exception as e: 
             print(f'An error occurred during instance info gathering')
             traceback.print_exc()
-
-    def get_instance_config(self, row, pricing_df):
-        try:
-            client = boto3.client('rds', region_name=row.region)
-            db_instance = client.describe_db_instances(DBInstanceIdentifier=row.instance)
-            instance_type = db_instance['DBInstances'][0]['DBInstanceClass']
-            temp_df = pricing_df[pricing_df['InstanceType']==instance_type]
-            temp_df['Memory'] = temp_df['Memory'].str.extract('(\d+)', expand=False)
-            temp_df['Memory'] = temp_df['Memory'].astype(int)
-            temp_df['vCPU'] = temp_df['vCPU'].astype(int)
-            vcpu = temp_df['vCPU'].iloc[0]
-            memory = temp_df['Memory'].iloc[0]
-            return memory, vcpu, instance_type
-        except Exception as e: 
-            print(f'An error occurred during instance info gathering')
-            traceback.print_exc()
-
 
     def get_instance_usage(self, row, args):
         try:
