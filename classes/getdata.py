@@ -48,7 +48,10 @@ class Getdata(object):
                 )
 
                 df_temp = pd.DataFrame(cw_response['MetricDataResults'][0])
-                return df_temp['Values'].iloc[0].round(decimals = 0)
+                if df_temp['Values'].iloc[0].round(decimals = 0):
+                    return df_temp['Values'].iloc[0].round(decimals = 0)
+                else: 
+                    return 'NaN'
             except Exception as e: 
                 print(f'An error occurred cloudwatch metric pull for {instance}')
                 traceback.print_exc()

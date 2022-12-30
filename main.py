@@ -14,14 +14,13 @@ import traceback
 def parse_args():
     try:
         parser = argparse.ArgumentParser(description='cloudwatch metric pull script')
-        parser.add_argument('-o', '--ouput_file', help='data and cost output filepath', type=str, required=False)
+        parser.add_argument('-o', '--output_file', help='data and cost output filepath', type=str, required=False)
         parser.add_argument('-d', '--days_back', help='days back to pull cloudwatch data', type=int, required=False)
         parser.add_argument('-s', '--start_time', help='start time for cloudwatch data pull', type=str, required=False)
         parser.add_argument('-e', '--end_time', help='end time for cloudwatch data pull', type=str, required=False)
         parser.add_argument('-r', '--region', help='region', type=str, required=True)
         parser.add_argument('-p', '--percent_discount', help='public pricing discount', type=float, required=False)
         parser.set_defaults(\
-                            output_file = 'data/rds_cost_output.csv', \
                             days_back = 7, \
                             )
         args = parser.parse_args()
@@ -55,12 +54,15 @@ def main():
     instance_df['gp3_monthly_storage_cost'] = \
         instance_df.apply (lambda row: getinstanceinfo.get_future_price(row, rds_pricing_df, args), axis=1, result_type='expand')
 
-    print(instance_df)
-
     # add pricing for rightsized gp3 storage
     
     # output to local csv 
-    instance_df.to_csv(args.output_file, index=False)
+    if args.output_file is not None:
+        instance_df.to_csv(args.output_file, index=False)
+    else:
+        account_id = getinstanceinfo.get_account_info(args)
+        output_file = f'data/{account_id}_{args.region}_rds_output.csv'
+        instance_df.to_csv(output_file, index=False)
     
 if __name__ == "__main__":
     main()

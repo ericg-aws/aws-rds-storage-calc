@@ -1,6 +1,0 @@
-instance,region,instance_type,db,engine,multi_az,storage_type,storage_size,storage_throughput,storage_iops,cw_storage_free,cw_storage_write_iops,cw_storage_read_iops,cw_storage_write_throughput,cw_storage_read_throughput,current_monthly_storage_cost,gp3_monthly_storage_cost
-rdscost-dev-medium-io1-01,us-east-2,db.r6g.2xlarge,test01,postgres,False,io1,200,0,6000,206355202048.0,48.0,1.0,708.0,1544355.0,506.26,67.23
-rdscost-dev-medium-io1-02,us-east-2,db.m6g.2xlarge,test01,postgres,True,io1,200,0,6000,206575316992.0,7.0,1.0,708.0,1199773.0,1255.5,134.46
-rdscost-dev-medium-io1-03,us-east-2,db.m6g.2xlarge,test01,postgres,True,io1,200,0,3000,206642913280.0,12.0,1.0,712.0,2331107.0,648.0,37.27
-rdscost-dev-small-gp2-01,us-east-2,db.r6g.2xlarge,test01,postgres,False,gp2,50,0,NaN,49517318144.0,50.0,1.0,708.0,1492027.0,NaN,NaN
-rdscost-dev-small-io1-02,us-east-2,db.t4g.xlarge,test01,mysql,False,io1,400,0,6000,416814772224.0,3.0,2.0,713.0,31293.0,526.5,207.36

@@ -9,9 +9,22 @@ from classes.getdata import Getdata
 
 class Getinstanceinfo(object):
 
+    def get_account_info(self, args):
+        try:
+            account_id = boto3.client('sts').get_caller_identity().get('Account')
+            return account_id
+        except Exception as e: 
+            print(f'An error occurred getting account ID')
+            traceback.print_exc()
+            return 'unknown-account'
+
     def round_up(self, n, decimals):
-        multiplier = 10 ** decimals
-        return math.ceil(n * multiplier) / multiplier
+        try:
+            multiplier = 10 ** decimals
+            return math.ceil(n * multiplier) / multiplier
+        except Exception as e: 
+            print(f'An error occurred with math rounding')
+            traceback.print_exc()
 
     def get_instance_list(self, args):
         # agther details of RDS instance deployed in the region
@@ -36,7 +49,10 @@ class Getinstanceinfo(object):
             paginator = rds.get_paginator('describe_db_instances').paginate()
             for page in paginator:
                 for dbinstance in page['DBInstances']:
-                    #pprint.pprint(dbinstance)
+                    pprint.pprint(dbinstance)
+                    if 'DBClusterIdentifier' in dbinstance:
+                        pass
+                        print('Skipping as instance is part of Multi-AZ Cluster or Aurora')
                     row_dict = {'instance' : dbinstance.get('DBInstanceIdentifier', 'NaN'), \
                         'region' : args.region, \
                         'instance_type' : dbinstance.get('DBInstanceClass'), \
