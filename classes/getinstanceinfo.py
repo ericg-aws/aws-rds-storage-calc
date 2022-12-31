@@ -51,8 +51,8 @@ class Getinstanceinfo(object):
                 for dbinstance in page['DBInstances']:
                     #pprint.pprint(dbinstance)
                     if 'DBClusterIdentifier' in dbinstance:
-                        pass
                         print('Skipping as instance is part of Multi-AZ Cluster or Aurora')
+                        continue
                     row_dict = {'instance' : dbinstance.get('DBInstanceIdentifier', 'NaN'), \
                         'region' : args.region, \
                         'instance_type' : dbinstance.get('DBInstanceClass'), \
