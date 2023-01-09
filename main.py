@@ -3,11 +3,12 @@
 # example for days back from current: python inference-get-metrics.py -d 7 -r us-east-2
 # utc start and endtime example: python inference-get-metrics.py -s '2022-06-25 02:00:00' -e '2022-07-12 02:00:00'
 
-from classes.getinstanceinfo import Getinstanceinfo
-
 import argparse
 import os
 import traceback
+
+from classes.getinstanceinfo import Getinstanceinfo
+from classes.getdata import Getdata
 
 # parse command-line arguments for region and input file
 # csv must have columns: instance,region
@@ -32,6 +33,7 @@ def parse_args():
 def main():
 
     getinstanceinfo = Getinstanceinfo()
+    getdata = Getdata()
         
     args = parse_args()
 
@@ -54,8 +56,13 @@ def main():
     instance_df['gp3_monthly_storage_cost'] = \
         instance_df.apply (lambda row: getinstanceinfo.get_future_price(row, rds_pricing_df, args), axis=1, result_type='expand')
 
+    # chnage bytes to gigabytes
+    instance_df['gp3_monthly_storage_cost'] = \
+        instance_df.apply (lambda row: getinstanceinfo.get_future_price(row, rds_pricing_df, args), axis=1, result_type='expand')
+
     # add pricing for rightsized gp3 storage
-    
+    instance_df['cw_storage_free'] = instance_df['cw_storage_free'].apply(getdata.convert_bytes_to_gb)
+
     # output to local csv 
     if args.output_file is not None:
         instance_df.to_csv(args.output_file, index=False)

@@ -1,11 +1,24 @@
 import boto3
 from datetime import datetime, timedelta
+import math 
 import pandas as pd
 from random import randrange
 import traceback
 
 class Getdata(object):
-    
+
+    def convert_bytes_to_gb(self, bytes_value):
+        try:
+            if bytes_value == 0 or bytes_value == 'NaN':
+                return 0
+            i = int(math.floor(math.log(bytes_value, 1024)))
+            p = math.pow(1024, i)
+            s = round(bytes_value / p, 2)
+            return s
+        except Exception as e: 
+            print(f'An error occurred in converting bytes')
+            traceback.print_exc()
+
     def cw_rds_pull_metric(self, cw_client, metric_name, namespace, instance_name, instance, stat, period, args):
             try:
                 print(f'Pulling cloudwatch data for instance: {instance} and metric: {metric_name}')

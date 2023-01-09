@@ -84,7 +84,6 @@ class Getinstanceinfo(object):
 
             cw_client = boto3.client('cloudwatch', region_name=row.region, config=config)
 
-            #metric_list = ['storage_free', 'storage_write_iops', 'storage_read_iops', 'storage_write_throughput', 'storage_read_throughput']
             metric_dict = [
                 {
                     'metric_name':'FreeStorageSpace',
@@ -110,14 +109,14 @@ class Getinstanceinfo(object):
                 {
                     'namespace': 'AWS/RDS',
                     'instance_name': 'DBInstanceIdentifier',
-                    'metric_name':'ReadThroughput',
+                    'metric_name':'WriteThroughput',
                     'stat':'p97.00',
                     'period':86400
                 },
                 {
                     'namespace': 'AWS/RDS',
                     'instance_name': 'DBInstanceIdentifier',
-                    'metric_name':'WriteThroughput',
+                    'metric_name':'ReadThroughput',
                     'stat':'p97.00',
                     'period':86400
                 }
