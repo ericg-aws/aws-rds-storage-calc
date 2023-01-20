@@ -26,7 +26,7 @@ class Getinstanceinfo(object):
             print(f'An error occurred with math rounding')
             traceback.print_exc()
 
-    def get_instance_list(self, args):
+    def get_instance_list(self, args, session, account_row):
         # agther details of RDS instance deployed in the region
         try:
             dtypes = np.dtype(
@@ -45,7 +45,7 @@ class Getinstanceinfo(object):
             )
             instance_df = pd.DataFrame(np.empty(0, dtype=dtypes))
 
-            rds = boto3.client('rds', region_name=args.region)
+            rds = session.client('rds', region_name=account_row['region'])
             paginator = rds.get_paginator('describe_db_instances').paginate()
             for page in paginator:
                 for dbinstance in page['DBInstances']:
@@ -71,7 +71,7 @@ class Getinstanceinfo(object):
             print(f'An error occurred during instance info gathering')
             traceback.print_exc()
 
-    def get_instance_usage(self, row, args):
+    def get_instance_usage(self, row, args, session, account_row):
         try:
             getdata = Getdata()
         
@@ -82,7 +82,7 @@ class Getinstanceinfo(object):
                 )
             )
 
-            cw_client = boto3.client('cloudwatch', region_name=row.region, config=config)
+            cw_client = session.client('cloudwatch', region_name=account_row['region'], config=config)
 
             metric_dict = [
                 {
@@ -96,28 +96,28 @@ class Getinstanceinfo(object):
                     'metric_name':'WriteIOPS',
                     'namespace': 'AWS/RDS',
                     'instance_name': 'DBInstanceIdentifier',
-                    'stat':'p97.00',
+                    'stat':'p98.00',
                     'period':86400
                 },
                 {
                     'metric_name':'ReadIOPS',
                     'namespace': 'AWS/RDS',
                     'instance_name': 'DBInstanceIdentifier',
-                    'stat':'p97.00',
+                    'stat':'p98.00',
                     'period':86400
                 },
                 {
                     'namespace': 'AWS/RDS',
                     'instance_name': 'DBInstanceIdentifier',
                     'metric_name':'WriteThroughput',
-                    'stat':'p97.00',
+                    'stat':'p98.00',
                     'period':86400
                 },
                 {
                     'namespace': 'AWS/RDS',
                     'instance_name': 'DBInstanceIdentifier',
                     'metric_name':'ReadThroughput',
-                    'stat':'p97.00',
+                    'stat':'p98.00',
                     'period':86400
                 }
             ]
@@ -126,11 +126,11 @@ class Getinstanceinfo(object):
             for item in metric_dict:
                 val = getdata.cw_rds_pull_metric(cw_client, item['metric_name'], item['namespace'], item['instance_name'], row.instance, item['stat'], item['period'], args)
                 result_list.append(val)
+
             return result_list[0], result_list[1], result_list[2], result_list[3], result_list[4]
         except Exception as e: 
             print(f'An error occurred during instance info gathering')
             traceback.print_exc()
-            pass
     
     def get_instance_pricing_data(self, args):
         try:
