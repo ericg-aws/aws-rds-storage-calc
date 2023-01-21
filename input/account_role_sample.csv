@@ -1,0 +1,3 @@
+account,region,role_arn
+041673561315,us-east-1,arn:aws:iam::041673561315:role/OrganizationAccountAccessRole
+296480489575,us-east-1,arn:aws:iam::296480411575:role/OrganizationAccountAccessRole
