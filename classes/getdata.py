@@ -1,7 +1,8 @@
 import boto3
 from datetime import datetime, timedelta
-import math 
+import logging
 import pandas as pd
+import math
 from random import randrange
 import traceback
 
@@ -16,12 +17,12 @@ class Getdata(object):
             s = round(bytes_value / p, 2)
             return s
         except Exception as e: 
-            print(f'An error occurred in converting bytes')
+            logging.error(f'An error occurred in converting bytes')
             traceback.print_exc()
 
     def cw_rds_pull_metric(self, cw_client, metric_name, namespace, instance_name, instance, stat, period, args):
             try:
-                print(f'Pulling cloudwatch data for instance: {instance} and metric: {metric_name}')
+                logging.debug(f'Pulling cloudwatch data for instance: {instance} and metric: {metric_name}')
                 id_name = f'rdsmetricpull{randrange(1000000)}'
                 
                 if args.start_time and args.end_time is not None:
@@ -66,6 +67,6 @@ class Getdata(object):
                 else: 
                     return df_temp['Values'].iloc[0].round(decimals = 0)
             except Exception as e: 
-                print(f'An error occurred cloudwatch metric pull for {instance}')
+                logging.error(f'An error occurred cloudwatch metric pull for {instance}')
                 traceback.print_exc()
                 return 'NaN'

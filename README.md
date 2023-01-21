@@ -3,6 +3,7 @@
 To estimate AWS cost savings by moving RDS storage from io1 to gp3 volume types.
 
 **Steps performed**
+- either use the current account and IAM principal or input list of accounts, regions, and roles to assume
 - gather all rds instances in region 
 - retrieving usage metrics from CloudWatch
 - pull down RDS bulk price list for region
@@ -35,15 +36,24 @@ To estimate AWS cost savings by moving RDS storage from io1 to gp3 volume types.
   pip install -r requirements.txt
   ```
 - specify days back from current time while considering a 19% PPA discount
+- this will use the current account and IAM principal (e.g. IAM user paired with access keys)
   ```py
   python main.py -d 7 -r us-east-2 -p 0.19
   ```
+- or use an input file (sample: input/account_role.csv) to assume a role in multiple accounts and regions
+  ```py
+  python main.py -d 7 -i input/account_role.csv -p 0.19
+  ```
 
+- the default output file will be data/<account_id>_<region>_rds_output.csv
+- the primary columns of interest will be: current_monthly_storage_cost and gp3_monthly_storage_cost
+- the costs savings will only be shown for io1 instances
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
 ## Roadmap
 
+- [ ] Show aggregate cost savings for all regions and accounts
 - [ ] Add ability for specific time range for looking at Cloudwatch data
 - [ ] Add ability for rightsizing gp3 recommendations based on usage of provisioned IOPS storage
 
