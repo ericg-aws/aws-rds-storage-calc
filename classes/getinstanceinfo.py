@@ -1,6 +1,6 @@
 import boto3
 from botocore.config import Config
-import pprint
+import logging
 import pandas as pd
 import numpy as np
 import math
@@ -12,9 +12,11 @@ class Getinstanceinfo(object):
     def get_account_info(self, args):
         try:
             account_id = boto3.client('sts').get_caller_identity().get('Account')
-            return account_id
+            account_arn = boto3.client('sts').get_caller_identity().get('Arn')
+            gen = boto3.client('sts').get_caller_identity()
+            return account_id, account_arn
         except Exception as e: 
-            print(f'An error occurred getting account ID')
+            logging.error(f'An error occurred getting account ID and Role ARN')
             traceback.print_exc()
             return 'unknown-account'
 
@@ -23,10 +25,10 @@ class Getinstanceinfo(object):
             multiplier = 10 ** decimals
             return math.ceil(n * multiplier) / multiplier
         except Exception as e: 
-            print(f'An error occurred with math rounding')
+            logging.error(f'An error occurred with math rounding')
             traceback.print_exc()
 
-    def get_instance_list(self, args):
+    def get_instance_list(self, args, session, region):
         # agther details of RDS instance deployed in the region
         try:
             dtypes = np.dtype(
@@ -45,11 +47,10 @@ class Getinstanceinfo(object):
             )
             instance_df = pd.DataFrame(np.empty(0, dtype=dtypes))
 
-            rds = boto3.client('rds', region_name=args.region)
+            rds = session.client('rds', region_name=region)
             paginator = rds.get_paginator('describe_db_instances').paginate()
             for page in paginator:
                 for dbinstance in page['DBInstances']:
-                    #pprint.pprint(dbinstance)
                     if 'DBClusterIdentifier' in dbinstance:
                         print('Skipping as instance is part of Multi-AZ Cluster or Aurora')
                         continue
@@ -66,12 +67,13 @@ class Getinstanceinfo(object):
                         }
                     temp_df = pd.DataFrame([row_dict])
                     instance_df = pd.concat([instance_df, temp_df], ignore_index=True)
+            logging.info(f'RDS Instance list')
             return instance_df
         except Exception as e: 
-            print(f'An error occurred during instance info gathering')
+            logging.error(f'An error occurred during instance info gathering')
             traceback.print_exc()
 
-    def get_instance_usage(self, row, args):
+    def get_instance_usage(self, row, args, session, region):
         try:
             getdata = Getdata()
         
@@ -82,7 +84,7 @@ class Getinstanceinfo(object):
                 )
             )
 
-            cw_client = boto3.client('cloudwatch', region_name=row.region, config=config)
+            cw_client = session.client('cloudwatch', region_name=region, config=config)
 
             metric_dict = [
                 {
@@ -96,28 +98,28 @@ class Getinstanceinfo(object):
                     'metric_name':'WriteIOPS',
                     'namespace': 'AWS/RDS',
                     'instance_name': 'DBInstanceIdentifier',
-                    'stat':'p97.00',
+                    'stat':'p98.00',
                     'period':86400
                 },
                 {
                     'metric_name':'ReadIOPS',
                     'namespace': 'AWS/RDS',
                     'instance_name': 'DBInstanceIdentifier',
-                    'stat':'p97.00',
+                    'stat':'p98.00',
                     'period':86400
                 },
                 {
                     'namespace': 'AWS/RDS',
                     'instance_name': 'DBInstanceIdentifier',
                     'metric_name':'WriteThroughput',
-                    'stat':'p97.00',
+                    'stat':'p98.00',
                     'period':86400
                 },
                 {
                     'namespace': 'AWS/RDS',
                     'instance_name': 'DBInstanceIdentifier',
                     'metric_name':'ReadThroughput',
-                    'stat':'p97.00',
+                    'stat':'p98.00',
                     'period':86400
                 }
             ]
@@ -126,20 +128,20 @@ class Getinstanceinfo(object):
             for item in metric_dict:
                 val = getdata.cw_rds_pull_metric(cw_client, item['metric_name'], item['namespace'], item['instance_name'], row.instance, item['stat'], item['period'], args)
                 result_list.append(val)
+
             return result_list[0], result_list[1], result_list[2], result_list[3], result_list[4]
         except Exception as e: 
-            print(f'An error occurred during instance info gathering')
+            logging.error(f'An error occurred during instance info gathering')
             traceback.print_exc()
-            pass
     
-    def get_instance_pricing_data(self, args):
+    def get_instance_pricing_data(self, region):
         try:
-            pricing_csv = f'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonRDS/current/{args.region}/index.csv'
+            pricing_csv = f'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonRDS/current/{region}/index.csv'
             pricing_df = pd.read_csv(pricing_csv, skiprows=5)
             pricing_df.columns = pricing_df.columns.str.replace(' ', '')
             return pricing_df
         except Exception as e: 
-            print(f'An error occurred during bulk pricing pull')
+            logging.error(f'An error occurred during bulk pricing pull')
             traceback.print_exc()
 
 
@@ -175,11 +177,11 @@ class Getinstanceinfo(object):
             else:
                 return 'NaN'
         except Exception as e: 
-            print(f'An error occurred during io1 cost calculation')
+            logging.error(f'An error occurred during io1 cost calculation')
             traceback.print_exc()
             return 'NaN'
 
-    def gp3_adjustments(self, row, args):
+    def gp3_adjustments(self, row):
         try:
             if row.engine in ['postgres', 'mysql', 'mariadb']:
                 if row.storage_size < 400:
@@ -215,14 +217,14 @@ class Getinstanceinfo(object):
             else:
                 return 'NaN'
         except Exception as e: 
-            print(f'An error occurred during gp3 io and adjustments')
+            logging.error(f'An error occurred during gp3 io and adjustments')
             traceback.print_exc()
             return 'NaN'
 
     def calc_gp3_costs(self, row, rds_pricing_df, storage_gb, storage_iops, storage_throughput, args):
 
         # make adjustments for 
-        storage_iops_adjusted, storage_throughput_adjusted = self.gp3_adjustments(row, args)
+        storage_iops_adjusted, storage_throughput_adjusted = self.gp3_adjustments(row)
 
         # calculate monthly storage GB costs 
         temp_df = rds_pricing_df[rds_pricing_df['usageType'].str.contains(storage_gb)]
@@ -260,6 +262,6 @@ class Getinstanceinfo(object):
             else:
                 return 'NaN'
         except Exception as e: 
-            print(f'An error occurred during future gp3 cost calculation')
+            logging.error(f'An error occurred during future gp3 cost calculation')
             traceback.print_exc()
             return 'NaN'
