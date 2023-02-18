@@ -172,9 +172,10 @@ class Getinstanceinfo(object):
             if row.storage_type == 'io1':
                 # future - need to add functionality for Multi-AZ deployment with two readable standby instances
                 if row.multi_az == True:
-                    logging.debug(f'Found multi-az instance')
+                    logging.debug(f'Found multi AZ instance')
                     return self.calc_io_costs(row, rds_pricing_df, ':Multi-AZ-PIOPS-Storage', ':Multi-AZ-PIOPS', args)
                 if row.multi_az == False:
+                    logging.debug(f'Found single Az instance')
                     return self.calc_io_costs(row, rds_pricing_df, ':PIOPS-Storage', ':PIOPS', args)
             else:
                 return 'NaN'
@@ -185,6 +186,7 @@ class Getinstanceinfo(object):
 
     def gp3_adjustments(self, row):
         try:
+            logging.info(f'Database engine: {row.engine}, storage size: {row.storage_size}, storage iops: {row.storage_iops}')
             if row.engine in ['postgres', 'mysql', 'mariadb']:
                 if row.storage_size < 400:
                     if row.storage_iops < 3000:

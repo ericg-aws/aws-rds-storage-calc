@@ -61,6 +61,7 @@ class Getdata(object):
                     ScanBy='TimestampDescending'
                 )
 
+                logging.debug(f'CW Metric response: {cw_response["MetricDataResults"][0]}')
                 df_temp = pd.DataFrame(cw_response['MetricDataResults'][0])
                 if df_temp.empty:
                     return 'NaN'
