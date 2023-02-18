@@ -29,7 +29,7 @@ class Getinstanceinfo(object):
             traceback.print_exc()
 
     def get_instance_list(self, args, session, region):
-        # agther details of RDS instance deployed in the region
+        # gather details of RDS instance deployed in the region
         try:
             dtypes = np.dtype(
                 [
@@ -51,8 +51,9 @@ class Getinstanceinfo(object):
             paginator = rds.get_paginator('describe_db_instances').paginate()
             for page in paginator:
                 for dbinstance in page['DBInstances']:
+                    logging.info(f'Found instance: {dbinstance.get("DBInstanceIdentifier")}')
                     if 'DBClusterIdentifier' in dbinstance:
-                        print('Skipping as instance is part of Multi-AZ Cluster or Aurora')
+                        logging.info(f'Skipping as instance is part of Multi-AZ Cluster or Aurora')
                         continue
                     row_dict = {'instance' : dbinstance.get('DBInstanceIdentifier', 'NaN'), \
                         'region' : args.region, \
@@ -67,7 +68,7 @@ class Getinstanceinfo(object):
                         }
                     temp_df = pd.DataFrame([row_dict])
                     instance_df = pd.concat([instance_df, temp_df], ignore_index=True)
-            logging.info(f'RDS Instance list')
+            logging.debug(f'RDS Instance list {instance_df}')
             return instance_df
         except Exception as e: 
             logging.error(f'An error occurred during instance info gathering')
@@ -144,7 +145,6 @@ class Getinstanceinfo(object):
             logging.error(f'An error occurred during bulk pricing pull')
             traceback.print_exc()
 
-
     def calc_io_costs(self, row, rds_pricing_df, storage_gb, storage_iops, args):
         # calculate monthly storage GB costs 
         temp_df = rds_pricing_df[rds_pricing_df['usageType'].str.contains(storage_gb)]
@@ -168,9 +168,11 @@ class Getinstanceinfo(object):
 
     def get_current_price(self, row, rds_pricing_df, args):
         try:
+            logging.debug(f'Found instance with storage type of: {row.storage_type}')
             if row.storage_type == 'io1':
                 # future - need to add functionality for Multi-AZ deployment with two readable standby instances
                 if row.multi_az == True:
+                    logging.debug(f'Found multi-az instance')
                     return self.calc_io_costs(row, rds_pricing_df, ':Multi-AZ-PIOPS-Storage', ':Multi-AZ-PIOPS', args)
                 if row.multi_az == False:
                     return self.calc_io_costs(row, rds_pricing_df, ':PIOPS-Storage', ':PIOPS', args)
@@ -226,23 +228,28 @@ class Getinstanceinfo(object):
         # make adjustments for 
         storage_iops_adjusted, storage_throughput_adjusted = self.gp3_adjustments(row)
 
+        logging.debug(f'Adjusted storage iops and throughput numbers: {storage_iops_adjusted}, {storage_throughput_adjusted}')
+
         # calculate monthly storage GB costs 
         temp_df = rds_pricing_df[rds_pricing_df['usageType'].str.contains(storage_gb)]
         per_unit = float(temp_df['PricePerUnit'].iat[0])
         gb_monthly_cost = float(row.storage_size) * per_unit
+        logging.debug(f'GB monthly cost: {gb_monthly_cost}')
 
         # calculate monthly storage IOPS costs 
         temp_df = rds_pricing_df[rds_pricing_df['usageType'].str.contains(storage_iops)]
         per_unit = float(temp_df['PricePerUnit'].iat[0])
         # consider 3000 built in for baseline cost
-        iops_monthly_cost = float((storage_iops_adjusted) - 3000) * per_unit
+        iops_monthly_cost = float(int(storage_iops_adjusted) - 3000) * per_unit
+        logging.debug(f'IOPS monthly cost: {gb_monthly_cost}')
 
         # calculate monthly storage Throughput costs 
         temp_df = rds_pricing_df[rds_pricing_df['usageType'].str.contains(storage_throughput)]
         per_unit = float(temp_df['PricePerUnit'].iat[0])
         # consider 125 MB/sec built in for baseline cost
-        throughput_monthly_cost = float((storage_throughput_adjusted) - 125) * per_unit
-
+        throughput_monthly_cost = float(int(storage_throughput_adjusted) - 125) * per_unit
+        logging.debug(f'Throughput monthly cost: {throughput_monthly_cost}')
+    
         if args.percent_discount is not None:
             storage_cost = ((gb_monthly_cost + iops_monthly_cost + throughput_monthly_cost) * (1.0 - args.percent_discount))
             storage_cost = self.round_up(storage_cost, 2)
@@ -260,6 +267,7 @@ class Getinstanceinfo(object):
                 if row.multi_az == False:
                     return self.calc_gp3_costs(row, rds_pricing_df, ':GP3-Storage', ':GP3-PIOPS', ':GP3-Throughput', args)
             else:
+                logging.debug(f'Instance is using gp3 future pricing calculation does not apply')
                 return 'NaN'
         except Exception as e: 
             logging.error(f'An error occurred during future gp3 cost calculation')

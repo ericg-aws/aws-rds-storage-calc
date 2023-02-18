@@ -16,8 +16,6 @@ import traceback
 from classes.getinstanceinfo import Getinstanceinfo
 from classes.getdata import Getdata
 
-logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
-
 # parse command-line arguments for region and input file
 def parse_args():
     try:
@@ -29,8 +27,10 @@ def parse_args():
         parser.add_argument('-r', '--region', help='region', type=str, required=False)
         parser.add_argument('-i', '--input_list', help='account and assume role input list', type=str, required=False)
         parser.add_argument('-p', '--percent_discount', help='public pricing discount', type=float, required=False)
+        parser.add_argument('-l', '--log_level', help='python log level', type=str, required=False)
         parser.set_defaults(\
                             days_back = 7,
+                            log_level = 'INFO'
                             )
         args = parser.parse_args()
         return args
@@ -86,9 +86,12 @@ def process_account_region(args, session, region, account_id):
             logging.info(f"No RDS instances found in account: {account_id} for region {region}")
 
 def main():
-    getinstanceinfo = Getinstanceinfo()
 
     args = parse_args()
+
+    logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=args.log_level)
+
+    getinstanceinfo = Getinstanceinfo()
 
     # when an input role and region list is specified
     if args.input_list is not None:
