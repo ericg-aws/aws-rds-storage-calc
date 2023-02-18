@@ -194,7 +194,7 @@ class Getinstanceinfo(object):
                     else:
                         return row.storage_iops, 125
                 else:
-                    if row.storage_iops < 12000:
+                    if row.storage_iops <= 12000:
                         return 12000, 500
                     elif 12000 < row.storage_iops <= 64000:
                         return row.storage_iops, 500
