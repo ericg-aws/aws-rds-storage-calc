@@ -249,14 +249,16 @@ class Getinstanceinfo(object):
         temp_df = rds_pricing_df[rds_pricing_df['usageType'].str.contains(storage_throughput)]
         per_unit = float(temp_df['PricePerUnit'].iat[0])
         # consider 125 MB/sec built in for baseline cost
-        throughput_monthly_cost = float(int(storage_throughput_adjusted) - 125) * per_unit
-        logging.debug(f'Throughput monthly cost: {throughput_monthly_cost}')
-    
-        if args.percent_discount is not None:
-            storage_cost = ((gb_monthly_cost + iops_monthly_cost + throughput_monthly_cost) * (1.0 - args.percent_discount))
-            storage_cost = self.round_up(storage_cost, 2)
-        else:
-            storage_cost = gb_monthly_cost + iops_monthly_cost + throughput_monthly_cost
+        if isinstance(storage_throughput_adjusted, int):
+            throughput_monthly_cost = float(storage_throughput_adjusted - 125) * per_unit
+            logging.debug(f'Throughput monthly cost: {throughput_monthly_cost}')
+
+            if args.percent_discount is not None:
+                storage_cost = ((gb_monthly_cost + iops_monthly_cost + throughput_monthly_cost) * (1.0 - args.percent_discount))
+                storage_cost = self.round_up(storage_cost, 2)
+            else:
+                storage_cost = gb_monthly_cost + iops_monthly_cost + throughput_monthly_cost
+                storage_cost = 'NaN'
 
         return storage_cost
 
