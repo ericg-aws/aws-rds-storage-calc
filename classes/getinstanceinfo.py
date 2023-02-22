@@ -166,6 +166,20 @@ class Getinstanceinfo(object):
 
         return storage_cost
 
+    def calc_io1_throughput(self, row, rds_pricing_df, args):
+        try:
+            logging.debug(f'Calculating throughput for based on io1 iops')
+            if row.storage_type == 'io1':
+                # assume 32K per IOP
+                io1_throughput = int((row.storage_iops * 32) / 1024)
+                return io1_throughput
+            else:
+                return 'NaN'
+        except Exception as e: 
+            logging.error(f'An error occurred during io1 throughput calculation')
+            traceback.print_exc()
+            return 'NaN'
+
     def get_current_price(self, row, rds_pricing_df, args):
         try:
             logging.debug(f'Found instance with storage type of: {row.storage_type}')
@@ -192,30 +206,33 @@ class Getinstanceinfo(object):
                     if row.storage_iops < 3000:
                         return 3000, 125
                     else:
-                        return row.storage_iops, 125
+                        if row.storage_throughput >= 125:
+                            return row.storage_iops, row.storage_throughput
+                        else:
+                            return row.storage_iops, 125
                 else:
                     if row.storage_iops <= 12000:
                         return 12000, 500
                     elif 12000 < row.storage_iops <= 64000:
-                        return row.storage_iops, 500
+                        return row.storage_iops, row.storage_throughput
                     else: 
                         return 'NaN', 'NaN'
             elif 'sqlserver' in row.engine:
                 if row.storage_iops < 3000:
                     return 3000, 125
                 else:
-                    return row.storage_iops, 125
+                    return row.storage_iops, row.storage_throughput
             elif 'oracle' in row.engine:
                 if row.storage_size < 200:
                     if row.storage_iops < 3000:
                         return 3000, 125
                     else:
-                        return row.storage_iops, 125
+                        return row.storage_iops, row.storage_throughput
                 else:
                     if row.storage_iops < 12000:
                         return 12000, 500
                     elif 12000 < row.storage_iops <= 64000:
-                        return row.storage_iops, 500
+                        return row.storage_iops, row.storage_throughput
                     else: 
                         return 'NaN', 'NaN'
             else:
@@ -258,7 +275,8 @@ class Getinstanceinfo(object):
                 storage_cost = self.round_up(storage_cost, 2)
             else:
                 storage_cost = gb_monthly_cost + iops_monthly_cost + throughput_monthly_cost
-                storage_cost = 'NaN'
+        else:
+            storage_cost = 'NaN'
 
         return storage_cost
 
@@ -267,8 +285,10 @@ class Getinstanceinfo(object):
             if row.storage_type == 'io1':
                 # future - need to add functionality for Multi-AZ deployment with two readable standby instances
                 if row.multi_az == True:
+                    logging.debug(f'Calculating gp3 costs based on multi-az storage')
                     return self.calc_gp3_costs(row, rds_pricing_df, ':Multi-AZ-GP3-Storage', ':Multi-AZ-GP3-PIOPS', ':Multi-AZ-GP3-Throughput', args)
                 if row.multi_az == False:
+                    logging.debug(f'Calculating gp3 costs based on single-az storage')
                     return self.calc_gp3_costs(row, rds_pricing_df, ':GP3-Storage', ':GP3-PIOPS', ':GP3-Throughput', args)
             else:
                 logging.debug(f'Instance is using gp3 future pricing calculation does not apply')
@@ -277,3 +297,22 @@ class Getinstanceinfo(object):
             logging.error(f'An error occurred during future gp3 cost calculation')
             traceback.print_exc()
             return 'NaN'
+
+    def gen_summary_statistics(self, instance_df):
+        try:
+            logging.debug(f'Summary statistics calculation')
+            instance_df.drop(instance_df[instance_df['storage_type'] != 'io1'].index, inplace = True)
+            instance_df.drop(instance_df[instance_df['current_monthly_storage_cost'] == 'NaN'].index, inplace = True)
+            instance_df.drop(instance_df[instance_df['gp3_monthly_storage_cost'] == 'NaN'].index, inplace = True)
+
+            old_cost = instance_df['current_monthly_storage_cost'].sum()
+            new_cost = instance_df['gp3_monthly_storage_cost'].sum()
+
+            total_savings = old_cost - new_cost
+            logging.info(f'Prior io1 total cost: {old_cost}, converted gp3 total cost: {new_cost}')
+            percent_reduction = int(abs((100 * float(new_cost)/float(old_cost))-100))
+            logging.info(f'Total gp3 savings in USD: {total_savings}, gives a percent reduction of: {percent_reduction}')
+            return instance_df
+        except Exception as e: 
+            logging.error(f'An error occurred during summary statistics calculation')
+            traceback.print_exc()

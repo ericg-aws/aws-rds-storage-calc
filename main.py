@@ -47,7 +47,7 @@ def process_account_region(args, session, region, account_id):
         instance_df = getinstanceinfo.get_instance_list(args, session, region)
 
 
-        # retrieving metrics - FreeStorageSpace, WriteIOPS, ReadIOPS, ReadThroughput, WriteThroughput
+        # retreiving metrics - FreeStorageSpace, WriteIOPS, ReadIOPS, ReadThroughput, WriteThroughput
         if not instance_df.empty:
             instance_df[['cw_storage_free', 'cw_storage_write_iops', 'cw_storage_read_iops', 'cw_storage_write_throughput', 'cw_storage_read_throughput']] = \
                 instance_df.apply (lambda row: getinstanceinfo.get_instance_usage(row, args, session, region), axis=1, result_type='expand')
@@ -55,15 +55,19 @@ def process_account_region(args, session, region, account_id):
             # pull down bulk price list for region
             rds_pricing_df = getinstanceinfo.get_instance_pricing_data(region)
 
-            # add pricing data for current storage costs
+            # add in IOPS estimate for io1
+            instance_df['storage_throughput'] = \
+                instance_df.apply (lambda row: getinstanceinfo.calc_io1_throughput(row, rds_pricing_df, args), axis=1, result_type='expand')
+
+            # calculate reasonable throughput 
             instance_df['current_monthly_storage_cost'] = \
                 instance_df.apply (lambda row: getinstanceinfo.get_current_price(row, rds_pricing_df, args), axis=1, result_type='expand')
 
-            # add pricing for gp3 storage - same paramters as current storage
+            # add pricing for gp3 storage - same parameters as current storage
             instance_df['gp3_monthly_storage_cost'] = \
                 instance_df.apply (lambda row: getinstanceinfo.get_future_price(row, rds_pricing_df, args), axis=1, result_type='expand')
 
-            # chnage bytes to gigabytes
+            # change bytes to gigabytes
             instance_df['gp3_monthly_storage_cost'] = \
                 instance_df.apply (lambda row: getinstanceinfo.get_future_price(row, rds_pricing_df, args), axis=1, result_type='expand')
 
@@ -71,6 +75,8 @@ def process_account_region(args, session, region, account_id):
             instance_df['cw_storage_free'] = instance_df['cw_storage_free'].apply(getdata.convert_bytes_to_gb)
 
             logging.debug(tabulate(instance_df, headers='keys', tablefmt='psql'))
+            
+            instance_df = getinstanceinfo.gen_summary_statistics(instance_df)
 
             # output to local csv 
             if args.output_file is not None:
