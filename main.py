@@ -45,8 +45,7 @@ def process_account_region(args, session, region, account_id):
         # gather all rds instances in region 
         logging.info(f"Region is set to: {region}, gathering RDS instance list.")
         instance_df = getinstanceinfo.get_instance_list(args, session, region)
-
-
+        
         # retreiving metrics - FreeStorageSpace, WriteIOPS, ReadIOPS, ReadThroughput, WriteThroughput
         if not instance_df.empty:
             instance_df[['cw_storage_free', 'cw_storage_write_iops', 'cw_storage_read_iops', 'cw_storage_write_throughput', 'cw_storage_read_throughput']] = \

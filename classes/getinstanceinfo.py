@@ -171,7 +171,7 @@ class Getinstanceinfo(object):
             logging.debug(f'Calculating throughput for based on io1 iops')
             if row.storage_type == 'io1':
                 # assume 32K per IOP
-                io1_throughput = int((row.storage_iops * 32) / 1024)
+                io1_throughput = int((row.storage_iops * 64) / 1024)
                 return io1_throughput
             else:
                 return 'NaN'
@@ -202,41 +202,60 @@ class Getinstanceinfo(object):
         try:
             logging.info(f'Database engine: {row.engine}, storage size: {row.storage_size}, storage iops: {row.storage_iops}')
             if row.engine in ['postgres', 'mysql', 'mariadb']:
-                if row.storage_size < 400:
-                    if row.storage_iops < 3000:
-                        return 3000, 125
+                if row.storage_size <= 400:
+                    if row.storage_iops <= 3000:
+                        return 0, 0                        
                     else:
                         if row.storage_throughput >= 125:
-                            return row.storage_iops, row.storage_throughput
+                            return (row.storage_iops - 3000), (row.storage_throughput - 125)
                         else:
-                            return row.storage_iops, 125
+                            return (row.storage_iops - 3000), 0
+                # storage size greater than 400GB 
                 else:
                     if row.storage_iops <= 12000:
-                        return 12000, 500
+                        return 0, 0
                     elif 12000 < row.storage_iops <= 64000:
-                        return row.storage_iops, row.storage_throughput
+                        if row.storage_throughput >= 500:
+                            return (row.storage_iops - 12000), (row.storage_throughput - 500)
+                        else:
+                            return (row.storage_iops - 12000), 0
                     else: 
                         return 'NaN', 'NaN'
+            # mssql has no secondary/higher pricing baseline 
             elif 'sqlserver' in row.engine:
-                if row.storage_iops < 3000:
-                    return 3000, 125
+                if row.storage_iops <= 3000:
+                    return 0, 0
+                # over 3000 iops and checking for throuput above or below baseline charges
                 else:
-                    return row.storage_iops, row.storage_throughput
+                    if 3000 < row.storage_iops <= 16000:
+                        if row.storage_throughput >= 125:
+                            return (row.storage_iops - 3000), (row.storage_throughput - 125)
+                        else:
+                            return (row.storage_iops - 3000), 0
+                    else: 
+                        return 'NaN', 'NaN'
             elif 'oracle' in row.engine:
-                if row.storage_size < 200:
-                    if row.storage_iops < 3000:
-                        return 3000, 125
+                if row.storage_size <= 200:
+                    if row.storage_iops <= 3000:
+                        return 0, 0                        
                     else:
-                        return row.storage_iops, row.storage_throughput
+                        if row.storage_throughput >= 125:
+                            return (row.storage_iops - 3000), (row.storage_throughput - 125)
+                        else:
+                            return (row.storage_iops - 3000), 0
+                # storage size greater than 200GB 
                 else:
-                    if row.storage_iops < 12000:
-                        return 12000, 500
+                    if row.storage_iops <= 12000:
+                        return 0, 0
                     elif 12000 < row.storage_iops <= 64000:
-                        return row.storage_iops, row.storage_throughput
+                        if row.storage_throughput >= 500:
+                            return (row.storage_iops - 12000), (row.storage_throughput - 500)
+                        else:
+                            return (row.storage_iops - 12000), 0
                     else: 
                         return 'NaN', 'NaN'
             else:
-                return 'NaN'
+                return 'NaN', 'NaN'
         except Exception as e: 
             logging.error(f'An error occurred during gp3 io and adjustments')
             traceback.print_exc()
@@ -265,9 +284,9 @@ class Getinstanceinfo(object):
         # calculate monthly storage Throughput costs 
         temp_df = rds_pricing_df[rds_pricing_df['usageType'].str.contains(storage_throughput)]
         per_unit = float(temp_df['PricePerUnit'].iat[0])
-        # consider 125 MB/sec built in for baseline cost
+
         if isinstance(storage_throughput_adjusted, int):
-            throughput_monthly_cost = float(storage_throughput_adjusted - 125) * per_unit
+            throughput_monthly_cost = float(storage_throughput_adjusted) * per_unit
             logging.debug(f'Throughput monthly cost: {throughput_monthly_cost}')
 
             if args.percent_discount is not None:
