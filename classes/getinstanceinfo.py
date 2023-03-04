@@ -222,7 +222,7 @@ class Getinstanceinfo(object):
                     else: 
                         return 'NaN', 'NaN'
             # mssql has no secondary/higher pricing baseline 
-            elif 'sqlserver' in row.engine:
+            elif row.engine in ['sqlserver-se', 'sqlserver-ee', 'sqlserver']:
                 if row.storage_iops <= 3000:
                     return 0, 0
                 # over 3000 iops and checking for throuput above or below baseline charges
@@ -234,7 +234,7 @@ class Getinstanceinfo(object):
                             return (row.storage_iops - 3000), 0
                     else: 
                         return 'NaN', 'NaN'
-            elif 'oracle' in row.engine:
+            elif row.engine in ['oracle-se', 'oracle-ee', 'oracle']:
                 if row.storage_size <= 200:
                     if row.storage_iops <= 3000:
                         return 0, 0                        
