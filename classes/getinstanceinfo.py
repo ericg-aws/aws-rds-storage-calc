@@ -234,7 +234,7 @@ class Getinstanceinfo(object):
                             return (row.storage_iops - 3000), 0
                     else: 
                         return 'NaN', 'NaN'
-            elif row.engine in ['oracle-se', 'oracle-ee', 'oracle']:
+            elif row.engine in ['oracle-se', 'oracle-ee', 'oracle', 'oracle-se2']:
                 if row.storage_size <= 200:
                     if row.storage_iops <= 3000:
                         return 0, 0                        
